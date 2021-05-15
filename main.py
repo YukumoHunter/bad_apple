@@ -10,18 +10,21 @@ FPS = 30
 
 
 def get_apple(video_link='https://www.youtube.com/watch?v=FtutLA63Cp8'):
-    shutil.rmtree('./video')
+    if os.path.exists('./video'):
+        shutil.rmtree('./video')
+    os.makedirs('./video')
 
-    with youtube_dl.YoutubeDL({'outtmpl': '/video/video.mp4'}) as ydl:
+    with youtube_dl.YoutubeDL({'format': 'bestvideo[ext=mp4][vcodec!*=av01]',
+                               'outtmpl': '/video/video.mp4'}) as ydl:
         ydl.download([video_link])
 
 
 def video_to_frames():
     cam = cv2.VideoCapture('./video/video.mp4')
 
-    shutil.rmtree('./frames')
-    if not os.path.exists('frames'):
-        os.makedirs('frames')
+    if os.path.exists('./frames'):
+        shutil.rmtree('./frames')
+    os.makedirs('./frames')
 
     currentframe = 0
     while True:
