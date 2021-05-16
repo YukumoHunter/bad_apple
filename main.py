@@ -5,7 +5,7 @@ import shutil
 import PIL.Image
 import time
 
-CHARSET = [".", ",", ":", ";", "+", "*", "?", "%", "S", "#", "@"]
+CHARSET = [" ", ".", ",", ":", ";", "+", "*", "?", "%", "S", "#", "@"]
 FPS = 30
 
 
@@ -64,6 +64,7 @@ def display_frames():
         print('Could not find image sequence.')
         return
 
+    os.system('cls')
     while os.path.exists(currentframe_path):
         image_string = asciify(currentframe_path)
         total_pixels = len(image_string)
@@ -71,7 +72,7 @@ def display_frames():
         result = '\n'.join(
             [image_string[index:index + width] for index in range(0, total_pixels, width)])
 
-        os.system('cls')
+        print('\033[0d')
         print(result)
 
         currentframe += 1
