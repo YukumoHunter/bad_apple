@@ -4,105 +4,132 @@ import os
 import shutil
 import PIL.Image
 import time
+from numpy import interp
 
-CHARSET = [" ", ".", ",", ":", ";", "+", "*", "?", "%", "S", "#", "@"]
-FPS = 30
-
-
-def get_apple(video_link='https://www.youtube.com/watch?v=FtutLA63Cp8'):
-    if os.path.exists('./video'):
-        shutil.rmtree('./video')
-    os.makedirs('./video')
-
-    with youtube_dl.YoutubeDL({'format': 'bestvideo[ext=mp4][vcodec!*=av01]',
-                               'outtmpl': '/video/video.mp4'}) as ydl:
-        ydl.download([video_link])
+FPS: int = 60
+SAVE_DIR: str = "./video"
+CHARSET: str = [" ", ".", ",", ":", ";", "+", "*", "?", "%", "S", "#", "@"]
+BAD_APPLE: str = "https://www.youtube.com/watch?v=FtutLA63Cp8"
 
 
-def video_to_frames():
-    cam = cv2.VideoCapture('./video/video.mp4')
+class Player:
+    def __init__(self, fps: int = FPS, size: tuple[int, int] = (96, 36),
+                 save_dir: str = SAVE_DIR, charset: list[str] = CHARSET):
+        self.fps = fps
+        self.size = size
+        self.save_dir = save_dir
+        self.charset = charset
+        self.id = None
 
-    if os.path.exists('./frames'):
-        shutil.rmtree('./frames')
-    os.makedirs('./frames')
+    @staticmethod
+    def __create_dir(dir: str, force_refresh: bool = False) -> None:
+        if force_refresh:
+            shutil.rmtree(dir)
 
-    currentframe = 0
-    while True:
-        ret, frame = cam.read()
+        if not os.path.exists(dir):
+            os.makedirs(dir)
 
-        if ret:
-            # resize/grayscale frame and write to ./frames directory
-            frame = cv2.resize(frame, (96, 36))
-            name = './frames/frame' + str(currentframe) + '.png'
-            cv2.imwrite(name, frame)
-            print('creating frame ' + str(currentframe))
-            currentframe += 1
-        else:
-            # no more frames left
-            break
+    @staticmethod
+    def __asciify(self, path: str) -> str:
+        image = PIL.Image.open(path)
+        # get pixel array as grayscale
+        pixeldata = image.convert('L').getdata()
+        # match pixel luminosity to a character in the charset
+        pixels = ''.join([self.charset[int(interp(pixel, [0, 255],
+                          [0, len(self.charset) - 1]))]
+                          for pixel in pixeldata])
 
-    # properly shut down :)
-    cam.release()
-    cv2.destroyAllWindows()
+        # Add line breaks to the string
+        width = self.size[0]
+        return '\n'.join([pixels[i:i + width]
+                          for i in range(0, len(pixels), width)])
 
+    def start(self) -> None:
+        os.system("cls")
+        inp = None
+        # This kinda sucks right now but I'll rewrite it with a match
+        # statement when python 3.10 fully releases :^)
+        while inp not in ["1", "2"]:
+            inp = input('What option would you like to select?\n'
+                        '1: Play Bad Apple\n'
+                        '2: Play another video\n'
+                        'Selection: ')
 
-def asciify(path):
-    image = PIL.Image.open(path)
-    pixels = image.convert('L').getdata()
-    image_string = ''.join([CHARSET[pixel//25] for pixel in pixels])
-    return image_string
+        if inp == '1':
+            self.__get_video()
+            self.__video_to_frames()
+            self.__play()
 
+        if inp == '2':
+            os.system('cls')
+            self.__get_video(input('Enter youtube link: '))
+            self.__video_to_frames()
+            self.__play()
 
-def display_frames():
-    currentframe = 0
-    currentframe_path = './frames/frame' + str(currentframe) + '.png'
-    try:
-        image = PIL.Image.open(currentframe_path)
-        width = image.size[0]
-        image.close()
-    except Exception:
-        print('Could not find image sequence.')
-        return
+    def __get_video(self, video_link: str = BAD_APPLE,
+                    force_refresh: bool = False) -> None:
+        # store the youtube video ID as identifier
+        self.id = video_link.split("=")[-1]
+        video_dir = f"{self.save_dir}/{self.id}"
 
-    os.system('cls')
-    while os.path.exists(currentframe_path):
-        image_string = asciify(currentframe_path)
-        total_pixels = len(image_string)
+        self.__create_dir(video_dir, force_refresh)
 
-        result = '\n'.join(
-            [image_string[index:index + width] for index in range(0, total_pixels, width)])
+        with youtube_dl.YoutubeDL({
+                "format": "bestvideo[ext=mp4][vcodec!*=av01]",
+                "outtmpl": f"{video_dir}/{self.id}.mp4"
+            }
+        ) as ydl:
+            ydl.download([video_link])
 
-        print('\033[0d')
-        print(result)
+    def __video_to_frames(self, force_refresh: bool = False) -> None:
+        video_dir = f"{self.save_dir}/{self.id}"
+        video_file = f"{video_dir}/{self.id}.mp4"
+        cam = cv2.VideoCapture(video_file)
 
-        currentframe += 1
-        currentframe_path = './frames/frame' + str(currentframe) + '.png'
-        time.sleep(1/FPS)
+        self.__create_dir(f"{video_dir}/frames", force_refresh)
 
-    os.system('cls')
-    print('End of video reached')
+        current_frame = 0
+        while True:
+            ret, frame = cam.read()
+
+            if ret:
+                frame_loc = f"{video_dir}/frames/{current_frame}.png"
+                # skip existing frames
+                if os.path.exists(frame_loc):
+                    continue
+                # resize/grayscale frame and write to ./frames directory
+                frame = cv2.resize(frame, self.size)
+                cv2.imwrite(frame_loc, frame)
+                print(f"Created frame {current_frame}")
+                current_frame += 1
+            else:
+                # Final frame passed
+                break
+
+        # Properly shut down
+        cam.release()
+        cv2.destroyAllWindows()
+
+    def __play(self) -> None:
+        os.system("cls")
+        video_dir = f"{self.save_dir}/{self.id}"
+        current_frame = 0
+        frame_loc = f"{video_dir}/frames/{current_frame}.png"
+        while os.path.exists(frame_loc):
+            frame = self.__asciify(self, frame_loc)
+            print("\033[0d", frame)
+            current_frame += 1
+            frame_loc = f"{video_dir}/frames/{current_frame}.png"
+
+            time.sleep(1/FPS)
+
+        os.system('cls')
+        print('End of video reached')
 
 
 def main():
-    os.system('cls')
-    inp = None
-    while inp not in ['1', '2', '3']:
-        inp = input('What option would you like to select?\n1: Download Bad Apple and play\n2: Download custom video '
-                    'and play\n3: Play downloaded video\nSelection: ')
-
-    if inp == '1':
-        get_apple()
-        video_to_frames()
-        display_frames()
-
-    if inp == '2':
-        os.system('cls')
-        get_apple(input('Enter youtube link: '))
-        video_to_frames()
-        display_frames()
-
-    if inp == '3':
-        display_frames()
+    player = Player()
+    player.start()
 
 
 if __name__ == '__main__':
