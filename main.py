@@ -6,10 +6,10 @@ import PIL.Image
 import time
 from numpy import interp
 
-FPS: int = 60
-SAVE_DIR: str = "./video"
-CHARSET: str = [" ", ".", ",", ":", ";", "+", "*", "?", "%", "S", "#", "@"]
-BAD_APPLE: str = "https://www.youtube.com/watch?v=FtutLA63Cp8"
+FPS = 60
+SAVE_DIR = "./video"
+CHARSET = [" ", ".", ",", ":", ";", "+", "*", "?", "%", "S", "#", "@"]
+BAD_APPLE = "https://www.youtube.com/watch?v=FtutLA63Cp8"
 
 
 class Player:
@@ -48,7 +48,7 @@ class Player:
         os.system("cls")
         inp = None
         # This kinda sucks right now but I'll rewrite it with a match
-        # statement when python 3.10 fully releases :^)
+        # statement when libs get updated to python 3.10 :^)
         while inp not in ["1", "2"]:
             inp = input('What option would you like to select?\n'
                         '1: Play Bad Apple\n'
@@ -57,14 +57,12 @@ class Player:
 
         if inp == '1':
             self.__get_video()
-            self.__video_to_frames()
-            self.__play()
-
         if inp == '2':
             os.system('cls')
             self.__get_video(input('Enter youtube link: '))
-            self.__video_to_frames()
-            self.__play()
+
+        self.__video_to_frames()
+        self.__play()
 
     def __get_video(self, video_link: str = BAD_APPLE,
                     force_refresh: bool = False) -> None:
@@ -82,6 +80,8 @@ class Player:
             ydl.download([video_link])
 
     def __video_to_frames(self, force_refresh: bool = False) -> None:
+        os.system('cls')
+
         video_dir = f"{self.save_dir}/{self.id}"
         video_file = f"{video_dir}/{self.id}.mp4"
         cam = cv2.VideoCapture(video_file)
@@ -111,20 +111,23 @@ class Player:
         cv2.destroyAllWindows()
 
     def __play(self) -> None:
-        os.system("cls")
+        os.system('cls')
+
         video_dir = f"{self.save_dir}/{self.id}"
         current_frame = 0
         frame_loc = f"{video_dir}/frames/{current_frame}.png"
         while os.path.exists(frame_loc):
             frame = self.__asciify(self, frame_loc)
-            print("\033[0d", frame)
+            # Clear the screen using ANSI escape sequence to avoid flickering
+            # After that output the frame
+            print(f"\033[0d{frame}")
             current_frame += 1
             frame_loc = f"{video_dir}/frames/{current_frame}.png"
 
             time.sleep(1/FPS)
 
         os.system('cls')
-        print('End of video reached')
+        print('End of video reached!')
 
 
 def main():
